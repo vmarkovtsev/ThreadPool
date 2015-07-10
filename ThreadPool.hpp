@@ -43,7 +43,7 @@ freely, subject to the following restrictions:
 class ThreadPool {
 public:
     // the constructor just launches some amount of workers
-    ThreadPool(size_t threads_n = std::thread::hardware_concurrency()) : stop(false)
+    ThreadPool(size_t threads_n = std::thread::hardware_concurrency(), const bool terminate = false) : stop(false), terminate(terminate)
     {
         if(!threads_n)
             throw std::invalid_argument("more than zero threads expected");
@@ -77,6 +77,15 @@ public:
     ThreadPool& operator=(const ThreadPool&) = delete;
     ThreadPool(ThreadPool&&) = delete;
     ThreadPool& operator=(ThreadPool&&) = delete;
+    // number of workers
+    size_t size() const{
+        return this->workers.size();
+    }
+    // current number of tasks in queue
+    size_t pending(){
+        std::unique_lock<std::mutex> lock(this->queue_mutex);
+        return this->tasks.size();
+    }
     // add new work item to the pool
     template<class F, class... Args>
     std::future<typename std::result_of<F(Args...)>::type> enqueue(F&& f, Args&&... args)
@@ -94,13 +103,15 @@ public:
         this->condition.notify_one();
         return res;
     }
-    // the destructor joins all threads
+    // the destructor joins or terminates all threads
     virtual ~ThreadPool()
     {
-        this->stop = true;
-        this->condition.notify_all();
-        for(std::thread& worker : this->workers)
-            worker.join();
+        if(!this->terminate){
+            this->stop = true;
+            this->condition.notify_all();
+            for(std::thread& worker : this->workers)
+                worker.join();
+        }
     }
 private:
     // need to keep track of threads so we can join them
@@ -113,6 +124,9 @@ private:
     std::condition_variable condition;
     // workers finalization flag
     std::atomic_bool stop;
+
+    // immediate thread termination flag
+    const bool terminate;
 };
 
 #endif // THREAD_POOL_HPP

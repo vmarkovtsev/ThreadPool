@@ -1,14 +1,18 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <sstream>
 
 #include "ThreadPool.hpp"
 
 int main()
 {
     
-    ThreadPool pool(4);
+    ThreadPool pool;
     std::vector< std::future<int> > results;
+    std::ostringstream buf;
+
+    std::cout << "Workers: " << pool.size() << std::endl;
 
     for(int i = 0; i < 8; ++i) {
         results.emplace_back(
@@ -20,6 +24,9 @@ int main()
             })
         );
     }
+
+    buf << '<' << pool.pending() << '>';
+    std::cout << buf.str();
 
     for(auto && result: results)
         std::cout << result.get() << ' ';
